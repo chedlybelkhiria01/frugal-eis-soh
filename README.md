@@ -4,7 +4,7 @@
 
 A full electrochemical impedance spectroscopy (EIS) sweep down to 0.02 Hz is slow, and embedded battery-management hardware has little time, memory and computing power. If a few well-chosen frequencies keep most of the accuracy, SoH diagnosis becomes faster and cheaper. This project studies that trade-off on public data, using lightweight models and an evaluation that never tests on a cell seen in training.
 
-> **Status: work in progress.** The data pipeline, evaluation and full-spectrum baselines (experiment E1) are done. Frequency-budget experiments (E2: error vs number of frequencies; E3: error vs estimated measurement time) come next.
+> **Status: work in progress.** The data pipeline, evaluation, full-spectrum baselines (E1) and error vs number of frequencies (E2) are done. Next: E3, error vs estimated measurement time.
 
 This is a student learning project, not a research claim. It is inspired by impedance-based battery diagnosis work at the Chair of Measurement and Sensor Technology, TU Chemnitz; it re-implements none of that work and is not affiliated with it.
 
@@ -26,7 +26,8 @@ Zhang, Y., Tang, Q., Zhang, Y., Wang, J., Stimming, U., Lee, A. A. *Identifying 
 - **Evaluation: leave-one-cell-out.** Train on 7 cells, test on the held-out 8th, repeat for all 8. Consecutive spectra of one cell are nearly identical, so a random row split would let a model recognise the cell instead of learning aging.
 - **Hyperparameter tuning is also done by cell.** Ridge regression with alpha chosen by leaving out single rows (`RidgeCV` default) scored *worse than predicting the mean*. Choosing alpha by leaving out training cells fixed it (see `NOTES.md`, Day 2).
 - **Metrics:** RMSE and MAE per held-out cell (mean ± std over the 8 cells). R² is reported only pooled: per-cell R² is unstable for cells whose SoH barely changes.
-- **Tests:** 32 automated tests cover the loader, a check that no cell appears in both training and test, and the features (`python -m pytest`).
+- **Frequency selection** (E2) is fitted on the training cells of each fold only. Selectors: mRMR, recursive feature elimination (RFE) and GPR length scales (ARD), compared against evenly log-spaced and random frequencies. Keeping a frequency keeps both its real and imaginary parts.
+- **Tests:** 44 automated tests cover the loader, a check that no cell appears in both training and test, the features, the models and the selectors (`python -m pytest`).
 
 ## Results so far: E1, full spectrum
 
@@ -52,6 +53,20 @@ Leave-one-cell-out over 8 cells at 25 °C. SoH is a fraction, so an RMSE of 0.07
   - Both are tuned on training rows, the same pattern that broke ridge. This is a finding about this setup, not about these model families. Zhang et al. used a different split, all spectra and both real and imaginary parts.
 - The cells age very differently, from a slow fade to sudden "knees", and the spread across held-out cells is large (std ≈ 33–73 % of the mean RMSE, depending on the model).
 
+## Results so far: E2, error vs number of frequencies
+
+![RMSE vs frequency budget](results/figures/fig2_rmse_vs_budget.png)
+
+Same leave-one-cell-out setup. Source: [`results/e2_budget.csv`](results/e2_budget.csv) (per cell, with the frequencies chosen in each fold) and `results/e2_budget_summary.csv`.
+
+- **A few frequencies are as good as all 60.**
+  - Ridge on the single frequency mRMR picks reaches RMSE 0.080, against 0.089 with all 60.
+  - The random forest with 2–3 mRMR or log-spaced frequencies matches its full-spectrum 0.077.
+- **The single most useful frequency is slow, about 0.04–0.05 Hz** (chosen by mRMR in all 8 folds). The random control agrees: every single frequency at or below 0.13 Hz scores 0.078–0.083, every one at 0.26 Hz or above scores 0.099–0.117.
+- **Beyond one frequency, the selectors do not clearly beat a simple log-spaced grid or random choice.** RFE and ARD are worse than random at most budgets. This is a negative result, reported as such.
+- The spread across held-out cells (std ≈ 0.03–0.05) is larger than most differences between selectors, so method rankings are uncertain.
+- 0.04 Hz means about 25 s per period: the fewest frequencies is not the fastest measurement. E3 quantifies that.
+
 ## Reproduce
 
 Tested with Python 3.14 on Windows 11; CPU only.
@@ -62,16 +77,19 @@ python -m venv .venv
 pip install -r requirements.txt
 pip install -e .
 # download and unzip the Zenodo data into data/raw/ (see data/README.md)
-python -m pytest                       # 32 tests
+python -m pytest                       # 44 tests
 python -m experiments.e1_full_spectrum # about 5 min, mostly GPR
 python -m experiments.e1_figures
+python -m experiments.e2_frequency_budget  # about 40 min
+python -m experiments.e2_figures
 ```
 
 ## Repository layout
 
 ```
 src/frugal_eis/   data.py (loading, labels) · features.py · models.py · evaluate.py (leave-one-cell-out harness)
-experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py
+                  selection.py (frequency selectors)
+experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py
 notebooks/        01_eda.ipynb (exploratory analysis)
 results/          CSVs and figures written by the experiment scripts
 tests/            pytest suite
@@ -87,7 +105,6 @@ NOTES.md          research log: decisions, findings, open questions
 
 ## Next
 
-- **E2:** SoH error vs number of selected frequencies (mRMR, RFE and ARD ranking, against log-spaced and random baselines).
 - **E3:** error vs estimated sweep time.
 - **E4:** robustness to measurement noise.
 - **E5:** transfer to 35 °C and 45 °C cells.

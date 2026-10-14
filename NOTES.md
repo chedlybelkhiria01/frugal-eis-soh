@@ -373,6 +373,84 @@ Files: `results/e1_full_spectrum.csv` (summary), `_per_cell.csv`, `_predictions.
   - the spread range (33–73 %, not 30–70 %);
   - the setup of the hour-long GPR fit (every 2nd spectrum, not every spectrum).
 
+## Day 4, Block 1: Frequency selectors
+
+**Code** (`src/frugal_eis/selection.py`)
+- `rank_mrmr`, `rank_rfe` and `rank_ard` each return a full ranking of the 60 frequencies. `select_mrmr/rfe/ard(X, y, k)` return its first k.
+- Controls: `select_logspaced(freqs, k)` and `select_random(k, seed)`.
+- `FrequencySelector(method, k)` is a scikit-learn transformer that keeps the Re and −Im columns of the selected frequencies. Inside a Pipeline under `loco_evaluate`, selection is fitted on training cells only, and a test confirms it.
+- Rankings are cached per training set, so E2 ranks once per fold, not once per k.
+
+**Design decisions**
+- **The unit is the frequency.** Methods rank the 120 columns; a frequency enters the ranking when either of its columns does. Keeping a frequency keeps both Re and −Im, because the instrument measures both at once.
+- **mRMR is written by hand** (the roadmap allowed it): greedy, score = |corr(x, y)| − mean |corr(x, chosen)|. It's transparent and has no pandas dependency. It is **not** the group's A\*-mRMR.
+- **RFE:** ridge with alpha = 1 on standardised columns, step 1, eliminated down to one column, which gives the full ranking.
+- **ARD:** GPR on −Im only, every 4th spectrum (the 120-feature fit is infeasible, Day 3). Frequencies tied at the upper length-scale bound are ordered by |corr(−Im, SoH)|.
+- **Log-spaced:** the grid is log-uniform (ratio ≈ 1.265 per step at both ends), so "evenly on a log scale" equals evenly spaced indices. k = 1 is the geometric middle.
+
+**Tests:** 11 in `tests/test_selection.py`, 43 in total, all passing.
+- The key synthetic test: one frequency is a near-copy of the best one. mRMR must pick the weaker but **independent** frequency second, while ranking by relevance alone would pick the copy. It does.
+
+**Preview: top 5 when ranking on all 8 cells.** This is not a result; E2 ranks inside each fold.
+
+| Method | Top 5 |
+|---|---|
+| mRMR | 0.040, 597, 0.020, 0.051, 1200 Hz |
+| RFE | 2.74, 0.020, 17.8, 35.9, 0.671 Hz |
+| ARD | 20000, 57.4, 0.165, 8.82, 953 Hz |
+| log-spaced, k = 5 | 20000, 597, 17.8, 0.671, 0.020 Hz |
+
+**[me]**
+- The methods disagree a lot.
+- mRMR favours the **slowest, most expensive** frequencies (0.02–0.05 Hz, i.e. 20–50 s per period). It has no notion of measurement cost, which is the motivation for E3, error vs sweep time. A cost-aware selection could be a natural extension.
+- RFE recovers 17.8 Hz (Zhang's ARD frequency) and 2.74 Hz (next to his 2.16 Hz).
+- ARD ranks 20 kHz first. That point lies in the inductive, cable-dominated region (see the physics guide), which is suspicious. To check in E2: whether it survives inside the folds, and whether it actually helps.
+
+## Day 4, Block 2: Experiment E2, error vs frequency budget
+
+**Code:** `experiments/e2_frequency_budget.py` writes `results/e2_budget.csv` (1,584 rows = 198 configurations × 8 held-out cells). Columns: model, selector, k, seed, cell, rmse, mae, n_train, n_test, selected_freqs (Hz), alpha. Run time 37.6 min; 7.4 min of that was the ARD ranking (once per fold, then cached).
+
+**Design decisions**
+- **Budgets:** k ∈ {1, 2, 3, 5, 8, 12, 20} plus "all" (60). "All" is the same for every selector, so it is computed once.
+- **Selection is fitted inside each fold on the 7 training cells** (`SelectedModel` under `loco_evaluate`), and the selected frequencies are logged per fold.
+- **Model: ridge, not GPR.** The roadmap allowed this if time was short, but the real reason is that GPR was worse than the mean predictor in E1 (0.139 vs 0.129). Alpha is tuned by inner leave-one-cell-out, as in E1. `SelectedModel` passes the cell ids through to the tuning (a new test checks this; 44 tests now).
+- **Robustness check:** the random forest (E1's best model) with the same selectors.
+- **Random control:** 20 seeds per k, ridge only, to keep the run under an hour.
+
+**Sanity check:** k = all reproduces E1 exactly (ridge 0.0894, RF 0.0767).
+
+## Day 4, Block 3: Figure and notes
+
+`experiments/e2_figures.py` writes `results/figures/fig2_rmse_vs_budget.png` and `results/e2_budget_summary.csv`. In the figure:
+- x is k on a log axis; y is RMSE, mean ± std over the 8 held-out cells; one line per selector;
+- one panel per model;
+- the grey band is the random control: 10th–90th percentile over 20 seeds of the mean per-cell RMSE (ridge panel only).
+
+Mean per-cell RMSE (from `e2_budget_summary.csv`):
+
+| Model | Selector | k=1 | 2 | 3 | 5 | 8 | 12 | 20 | all 60 |
+|---|---|---|---|---|---|---|---|---|---|
+| ridge | mRMR | **0.080** | 0.087 | 0.086 | 0.084 | 0.083 | 0.086 | 0.086 | 0.089 |
+| ridge | log-spaced | 0.109 | 0.094 | 0.089 | 0.091 | 0.091 | 0.092 | 0.092 | |
+| ridge | RFE | 0.113 | 0.107 | 0.103 | 0.101 | 0.093 | 0.095 | 0.098 | |
+| ridge | ARD | 0.109 | 0.099 | 0.096 | 0.103 | 0.100 | 0.099 | 0.095 | |
+| ridge | random, median of 20 seeds | 0.110 | 0.090 | 0.095 | 0.089 | 0.091 | 0.090 | 0.090 | |
+| RF | mRMR | 0.112 | 0.079 | 0.077 | 0.084 | 0.077 | 0.079 | 0.084 | 0.077 |
+| RF | log-spaced | 0.122 | 0.077 | 0.082 | 0.084 | 0.077 | **0.071** | 0.076 | |
+| RF | RFE | 0.109 | 0.105 | 0.102 | 0.107 | 0.093 | 0.096 | 0.084 | |
+| RF | ARD | 0.136 | 0.111 | 0.105 | 0.108 | 0.108 | 0.105 | 0.079 | |
+
+**[me] What the figure actually shows**
+1. **A few frequencies are as good as all 60.** Ridge with mRMR is at or below the full spectrum (0.089) at every k. The random forest with mRMR or log-spaced frequencies matches its full spectrum (0.077) from k = 2. For SoH at 25 °C, the full 60-point sweep is mostly redundant.
+2. **The one frequency that matters is slow: about 0.04–0.05 Hz.** At k = 1, mRMR chose 0.040 Hz in 6 folds and 0.051 Hz in 2, and ridge on it reaches 0.080. The random control confirms this independently. Every random single frequency at or below 0.13 Hz scores 0.078–0.083, 0.16 Hz scores 0.090, and every one at 0.26 Hz or above scores 0.099–0.117. This is the low-frequency, diffusion-dominated end of the spectrum.
+3. **Selection does not clearly beat log-spacing or random beyond k = 1.**
+   - For ridge, mRMR is better than log-spaced on 3–6 of 8 cells depending on k, and sits at the good edge of the random band rather than outside it.
+   - For the random forest, log-spaced is as good as or better than mRMR (best overall: log-spaced k = 12, 0.071).
+   - **RFE and ARD are worse than random** at most budgets for ridge, and worse than log-spaced at most budgets for both models.
+   - So the honest result is: the data-driven selectors add little over a simple log-spaced grid, except mRMR at k = 1, which finds the slow frequency.
+4. **The selectors are unstable across folds.** Beyond the first, slow frequency, mRMR's second pick varies between 73 Hz and 4.9 kHz depending on which cell is held out. ARD's single pick is 20 kHz in 2 of 8 folds; that is the inductive, cable-dominated region flagged on Day 4, and it did not help. Different picks giving similar errors is more evidence of redundancy.
+5. **The cell-to-cell spread dominates.** The std across held-out cells (≈ 0.03–0.05) is larger than almost every gap between selectors (≈ 0.01–0.02). With 8 cells, rankings between methods are not reliable; only "few frequencies ≈ all" and "a slow frequency is best at k = 1" are consistent patterns. The catch for practice: 0.04 Hz means about 25 s per period. "Fewest frequencies" is not the same as "fastest measurement", and E3 measures exactly that trade-off.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
