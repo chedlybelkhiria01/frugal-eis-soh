@@ -27,7 +27,7 @@ Zhang, Y., Tang, Q., Zhang, Y., Wang, J., Stimming, U., Lee, A. A. *Identifying 
 - **Hyperparameter tuning is also done by cell.** Ridge regression with alpha chosen by leaving out single rows (`RidgeCV` default) scored *worse than predicting the mean*. Choosing alpha by leaving out training cells fixed it (see `NOTES.md`, Day 2).
 - **Metrics:** RMSE and MAE per held-out cell (mean ± std over the 8 cells). R² is reported only pooled: per-cell R² is unstable for cells whose SoH barely changes.
 - **Frequency selection** (E2) is fitted on the training cells of each fold only. Selectors: mRMR, recursive feature elimination (RFE) and GPR length scales (ARD), compared against evenly log-spaced and random frequencies. Keeping a frequency keeps both its real and imaginary parts.
-- **Tests:** 49 automated tests cover the loader, a check that no cell appears in both training and test, the features, the models, the selectors and the sweep-time estimate (`python -m pytest`).
+- **Tests:** 50 automated tests cover the loader, a check that no cell appears in both training and test, the features, the models, the selectors and the sweep-time estimate (`python -m pytest`).
 
 ## Results so far: E1, full spectrum
 
@@ -77,12 +77,14 @@ python -m venv .venv
 pip install -r requirements.txt
 pip install -e .
 # download and unzip the Zenodo data into data/raw/ (see data/README.md)
-python -m pytest                       # 49 tests
+python -m pytest                       # 50 tests
 python -m experiments.e1_full_spectrum # about 5 min, mostly GPR
 python -m experiments.e1_figures
 python -m experiments.e2_frequency_budget  # about 40 min
 python -m experiments.e2_figures
 python -m experiments.e3_figures
+python -m experiments.e4_noise          # about 7 min
+python -m experiments.e4_figures
 ```
 
 ## Repository layout
@@ -90,7 +92,7 @@ python -m experiments.e3_figures
 ```
 src/frugal_eis/   data.py (loading, labels) · features.py · models.py · evaluate.py (leave-one-cell-out harness)
                   selection.py (frequency selectors) · timing.py (sweep-time estimate)
-experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py
+experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py · e4_noise.py · e4_figures.py
 notebooks/        01_eda.ipynb (exploratory analysis)
 results/          CSVs and figures written by the experiment scripts
 tests/            pytest suite

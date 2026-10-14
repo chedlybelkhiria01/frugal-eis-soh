@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from frugal_eis.features import full_spectrum, full_spectrum_names, ohmic_feature
+from frugal_eis.features import full_spectrum, full_spectrum_names, multiplicative_noise, ohmic_feature
 
 
 def test_full_spectrum_order():
@@ -33,6 +33,17 @@ def test_ohmic_shape_and_rows_independent():
     r0 = ohmic_feature(re, im)
     assert r0.shape == (2, 1)
     np.testing.assert_allclose(r0[:, 0], [0.39, 0.65])
+
+
+def test_multiplicative_noise_is_relative_and_independent():
+    X = np.full((20000, 2), [0.1, 10.0])
+    noisy = multiplicative_noise(X, 0.02, np.random.default_rng(0))
+    rel = noisy / X - 1
+    np.testing.assert_allclose(rel.std(axis=0), 0.02, rtol=0.03)      # same relative size at 0.1 Ω and 10 Ω
+    assert abs(np.corrcoef(rel[:, 0], rel[:, 1])[0, 1]) < 0.03          # Re and Im perturbed independently
+    np.testing.assert_array_equal(multiplicative_noise(X, 0, np.random.default_rng(0)), X)
+    with pytest.raises(ValueError):
+        multiplicative_noise(X, -0.1, np.random.default_rng(0))
 
 
 def test_ohmic_never_crossing_raises():

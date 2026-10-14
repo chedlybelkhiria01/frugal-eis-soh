@@ -19,6 +19,20 @@ def full_spectrum_names(freqs: np.ndarray) -> list[str]:
     return [f"Re@{f:.3g}Hz" for f in freqs] + [f"mIm@{f:.3g}Hz" for f in freqs]
 
 
+def multiplicative_noise(X: np.ndarray, sigma: float, rng: np.random.Generator) -> np.ndarray:
+    """Relative measurement noise: X * (1 + sigma * N(0, 1)), drawn independently for every entry.
+
+    On a full-spectrum matrix [Re, -Im] this perturbs Re(Z) and Im(Z) of every frequency independently,
+    i.e. Z_noisy = Re(Z)(1 + σ ε1) + j Im(Z)(1 + σ ε2). Returns a new array; sigma = 0 returns a copy.
+    """
+    X = np.asarray(X, dtype=float)
+    if sigma < 0:
+        raise ValueError("sigma must be >= 0")
+    if sigma == 0:
+        return X.copy()
+    return X * (1.0 + sigma * rng.standard_normal(X.shape))
+
+
 def ohmic_feature(X_re: np.ndarray, X_im: np.ndarray) -> np.ndarray:
     """High-frequency real-axis intercept, an estimate of the ohmic resistance R0. Shape (n_spectra, 1).
 

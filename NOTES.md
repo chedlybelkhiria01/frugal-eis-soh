@@ -477,6 +477,45 @@ Mean per-cell RMSE (from `e2_budget_summary.csv`):
   - a cost-aware selector that maximises relevance per second inside each fold.
 - If either holds up under leave-one-cell-out, it is the strongest finding of the project: mid frequencies (charge transfer / SEI region) carry the aging signal at a fraction of the time cost.
 
+## Day 5, Block 2: E4, noise robustness
+
+**Code**
+- `features.multiplicative_noise(X, σ, rng)` = X · (1 + σ·N(0,1)) per entry, i.e. Re and Im perturbed independently (1 new test, 50 in total).
+- `experiments/e4_noise.py` writes `results/e4_noise.csv` (2,000 rows = 5 models × 8 cells × 5 σ × 10 seeds). Run time 7 min.
+- `experiments/e4_figures.py` writes `fig4_noise_robustness.png` and `e4_noise_summary.csv`.
+
+**Design decisions**
+- **Models are trained on clean spectra; noise is added to the test spectra only.** σ ∈ {0, 0.5, 1, 2, 5} %, 10 seeds.
+- **Identical noise for every model:** one noisy copy per (fold, σ, seed), seeded by (seed, fold) and given to all models.
+- **Which small subset:** the lowest mean E2 RMSE with k ≤ 5, random control excluded, chosen automatically from `e2_budget_summary.csv`:
+  - ridge → mRMR, k = 1 (≈ 0.04 Hz);
+  - RF → log-spaced, k = 2 (20 kHz + 0.020 Hz).
+  - Caveat: this choice uses E2's held-out results, so the small subsets start with a slight optimistic bias.
+- Frequency selection is refitted per fold on the clean training cells, as in E2.
+- **GPR full spectrum is included because the plan asks for it**: E1's setup (−Im only, every 4th spectrum). Ridge and RF are compared too, because GPR is not the competitive model here.
+
+**Sanity check:** σ = 0 reproduces E1/E2 (GPR 0.139, RF 0.077, ridge 0.089, ridge mRMR k = 1 0.080, RF log-spaced k = 2 0.077).
+
+**Results: mean per-cell RMSE [data, `e4_noise_summary.csv`]**
+
+| Model | σ = 0 | 0.5 % | 1 % | 2 % | 5 % |
+|---|---|---|---|---|---|
+| ridge, 60 freq. | 0.089 | 0.089 | 0.090 | 0.090 | 0.091 |
+| ridge, mRMR 1 freq. | 0.080 | 0.080 | 0.080 | 0.083 | **0.098** |
+| RF, 60 freq. | 0.077 | 0.076 | 0.076 | 0.075 | 0.074 |
+| RF, log-spaced 2 freq. | 0.077 | 0.077 | 0.078 | 0.079 | **0.095** |
+| GPR, 60 freq. (−Im) | 0.139 | 0.140 | 0.142 | 0.147 | 0.159 |
+
+Over the 10 seeds, the cell-averaged RMSE spans at most 0.012 (GPR at 5 %) and at most 0.007 for the other models.
+
+**[me] What it shows**
+1. **Up to 1 % noise, the small subsets lose nothing** (≤ 0.001 RMSE) and stay better than or equal to the full spectrum.
+2. **From 2 % they start to degrade, and at 5 % they lose their advantage:** +0.018 (ridge, 1 freq.) and +0.019 (RF, 2 freq.). Ridge on 60 frequencies is then better than ridge on 1 (0.091 vs 0.098).
+3. **The full spectrum is almost immune** (ridge +0.002 at 5 %). Sixty frequencies carrying redundant information average independent noise out; one or two frequencies cannot. **This is the price of frugality: fewer frequencies, less averaging.** The same logic says a frugal sweep could spend the saved time on repeated readings of its few frequencies.
+4. **RF on the full spectrum gets slightly *better* with noise** (0.077 → 0.074), driven by cells 25C04 (0.120 → 0.100) and 25C02. I read this as an artefact, not a benefit: noise pushes the trees' outputs towards the middle of the training range, which happens to help cells the forest over- or under-predicts. Do not report it as noise "helping".
+5. **GPR is the worst at every level and degrades the most** (+0.020 at 5 %), consistent with E1: its fit has a very small noise term, so it is sensitive to inputs away from the training spectra.
+- **Open:** what noise level is realistic for this instrument? I have not checked the instrument's accuracy spec. If it is around 1 % or better, the frugal subsets are safe; that needs a source before it goes in the report.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
