@@ -451,6 +451,32 @@ Mean per-cell RMSE (from `e2_budget_summary.csv`):
 4. **The selectors are unstable across folds.** Beyond the first, slow frequency, mRMR's second pick varies between 73 Hz and 4.9 kHz depending on which cell is held out. ARD's single pick is 20 kHz in 2 of 8 folds; that is the inductive, cable-dominated region flagged on Day 4, and it did not help. Different picks giving similar errors is more evidence of redundancy.
 5. **The cell-to-cell spread dominates.** The std across held-out cells (≈ 0.03–0.05) is larger than almost every gap between selectors (≈ 0.01–0.02). With 8 cells, rankings between methods are not reliable; only "few frequencies ≈ all" and "a slow frequency is best at k = 1" are consistent patterns. The catch for practice: 0.04 Hz means about 25 s per period. "Fewest frequencies" is not the same as "fastest measurement", and E3 measures exactly that trade-off.
 
+## Day 5, Block 1: E3, estimated acquisition time
+
+**Code**
+- `src/frugal_eis/timing.py`: `sweep_time(freqs, n_periods=3, settle_s=0)` = Σ (n_periods / f + settle_s). 5 tests in `tests/test_timing.py`; 49 tests in total.
+- `experiments/e3_figures.py` re-uses E2's per-fold results (no new training). It converts each fold's selected frequencies into a sweep time and writes `results/e3_time.csv` (mean ± std over folds of time and RMSE) and `results/figures/fig3_rmse_vs_time.png`.
+
+**Assumptions (also in the docstring)**
+- The estimate is a **lower bound, not a measurement**: 3 periods per frequency, one frequency after another.
+- Settling, averaging and instrument overhead are ignored, and so is the 15 min rest before state V (the same for every budget).
+- `selected_freqs` is stored to 4 significant digits, so times are off by < 0.05 %.
+
+**Numbers [data, from `e3_time.csv`]**
+- **Full sweep (60 frequencies): 719 s ≈ 12 min**, with RMSE 0.089 (ridge) and 0.077 (RF).
+- mRMR k = 1 (0.040 or 0.051 Hz): about 70 s, RMSE 0.080 (ridge), **about 10× faster than the full sweep with no loss**.
+- **Among the selectors (excluding random), the cheapest point that matches the best full-spectrum error** (RF, 0.077) is the random forest with 2 log-spaced frequencies (20 kHz and 0.020 Hz): 150 s, RMSE 0.077.
+- Log-spaced with k ≥ 2 always includes 0.020 Hz, the slowest frequency (150 s alone). Its cost barely depends on k.
+- **ARD picks fast frequencies**: k = 1 takes 0.07 s, k = 3 takes 6 s, but the error is 0.096–0.11 for ridge. **RFE** sits in between (38–270 s).
+
+**[me] A lead from the random control, not a result**
+- Ridge's best point overall is a *random* draw: k = 2, seed 1 = **35.9 Hz + 17.8 Hz**, RMSE 0.076 ± 0.046 in **0.25 s**.
+- 17.8 Hz is the frequency Zhang et al.'s ARD ranked highest. So two mid-frequency points, about 3000× faster than the full sweep, matched the best full-spectrum model here.
+- **But it was picked after the fact from 140 random draws, so its error is optimistic** (best of many). To make it a fair result, the pair must be chosen *before* looking at the test cells. Two ways:
+  - a "prior-knowledge" selector that fixes Zhang's 17.8 Hz (+ 2.16 Hz) from the paper;
+  - a cost-aware selector that maximises relevance per second inside each fold.
+- If either holds up under leave-one-cell-out, it is the strongest finding of the project: mid frequencies (charge transfer / SEI region) carry the aging signal at a fraction of the time cost.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
