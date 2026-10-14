@@ -93,7 +93,7 @@ def rank_ard(X, y, n_freq: int = N_FREQ, stride: int = 4) -> np.ndarray:
     return np.lexsort((-_abs_corr_with(X_im, np.asarray(y, float)), np.round(np.log10(ls), 6)))
 
 
-# --- selectors (the names used in the roadmap) ----------------------------------------------------
+# --- selectors (the names used in the project plan) ----------------------------------------------------
 
 def select_mrmr(X, y, k: int, n_freq: int = N_FREQ) -> np.ndarray:
     return rank_mrmr(X, y, n_freq)[:k]

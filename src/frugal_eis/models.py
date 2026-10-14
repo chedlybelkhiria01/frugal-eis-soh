@@ -14,7 +14,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-# Roadmap grid was logspace(-4, 3, 30); widened because cell-wise tuning chose the upper edge (1e3) in 7/8 folds.
+# Initially planned grid was logspace(-4, 3, 30); widened because cell-wise tuning chose the upper edge (1e3) in 7/8 folds.
 RIDGE_ALPHAS = np.logspace(-4, 6, 41)
 
 

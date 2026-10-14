@@ -243,7 +243,7 @@ Run with `python -m pytest -q`: **18 passed** (about 40 s, mostly data loading).
 | `tests/test_evaluate.py` | **Leakage**: in every leave-one-cell-out fold, train and test cells are disjoint and the test fold is exactly the held-out cell; every cell is held out once. Run on synthetic interleaved groups and on the real 12 cells |
 | `tests/test_features.py` | Feature order of `full_spectrum`; `ohmic_feature` on hand-made spectra with known answers (zero crossing at 0.41 Ω, no inductive part, rows independent, error if −Im never crosses zero) |
 
-**Changed from the roadmap: the SoH bound is (0, 1], not (0.3, 1.1)** [data]
+**Changed from the plan: the SoH bound is (0, 1], not (0.3, 1.1)** [data]
 - 25 spectra of **25C05** have SoH below 0.3, with a minimum of 0.184. That cell genuinely collapses (see `eda_capacity_fade.png`); it isn't a parsing error.
 - Loosening a test so it passes would hide information, so the test instead checks what must always hold: SoH > 0, SoH ≤ 1, and exactly 1.0 at each cell's first spectrum.
 - Minimum SoH per cell: 25C05 0.184, 35C01 0.360, 25C01 0.370, 25C07 0.442; all others ≥ 0.53.
@@ -293,11 +293,11 @@ Setup: state V, 25 °C, 1,343 spectra, 8 cells, leave-one-cell-out.
 |---|---|---|---|---|
 | mean_predictor (reference) | — | 0.129 ± 0.058 | 0.104 ± 0.045 | −0.04 |
 | ohmic_linear (physics baseline) | R0 only | 0.108 ± 0.058 | 0.090 ± 0.052 | 0.15 |
-| ridge_full (RidgeCV, row-wise alpha selection, as in the roadmap) | 120 | 0.148 ± 0.077 | 0.136 ± 0.082 | −0.50 |
+| ridge_full (RidgeCV, row-wise alpha selection, as originally planned) | 120 | 0.148 ± 0.077 | 0.136 ± 0.082 | −0.50 |
 | **ridge_full_groupcv** (alpha by inner leave-one-cell-out) | 120 | **0.089 ± 0.038** | **0.082 ± 0.039** | **0.49** |
 
 **What happened, step by step (the order matters, so I'm keeping it honest)**
-1. **First run, as in the roadmap** (`RidgeCV`, grid 1e-4…1e3): ridge on the full spectrum was **worse than the mean predictor** (RMSE 0.149). Its chosen alphas were tiny (0.0009–0.005).
+1. **First run, as originally planned** (`RidgeCV`, grid 1e-4…1e3): ridge on the full spectrum was **worse than the mean predictor** (RMSE 0.149). Its chosen alphas were tiny (0.0009–0.005).
 2. **Diagnosis [me]:** by default, RidgeCV picks alpha by leaving out single **rows**. Neighbouring spectra of the same cell are almost identical, so this inner validation leaks, just as a random outer split would. It rewards a model that memorises cell-specific detail, and that detail doesn't transfer to an unseen cell.
 3. **Fix:** `GroupRidgeCV` in `models.py` picks alpha by leaving out one *training cell* at a time, mirroring the outer evaluation. `loco_evaluate` now passes the training cells' ids to `fit` when the model accepts `groups`; a test confirms the held-out cell is never among them.
 4. **Second run:** RMSE 0.086, but the chosen alpha sat at the **upper edge of the grid (1000) in 7 of 8 folds**, so the true optimum could lie beyond it.
@@ -334,7 +334,7 @@ Setup: state V, 25 °C, 1,343 spectra, 8 cells, leave-one-cell-out.
 | GPR, −Im only, every 4th spectrum | 23.8 s | 0.151 |
 
 - GPR with every 2nd spectrum was still running after about 4 minutes, so I stopped it.
-- **Decision:** E1 uses GPR on **−Im only (60 features), every 4th training spectrum**. This is the roadmap's "if slow" fallback; it took 259 s for all 8 folds. Recorded as a limitation.
+- **Decision:** E1 uses GPR on **−Im only (60 features), every 4th training spectrum**. This is the plan's "if slow" fallback; it took 259 s for all 8 folds. Recorded as a limitation.
 
 **Block 2: E1 results** (`python -m experiments.e1_full_spectrum`, about 5 min) [data]
 
@@ -383,7 +383,7 @@ Files: `results/e1_full_spectrum.csv` (summary), `_per_cell.csv`, `_predictions.
 
 **Design decisions**
 - **The unit is the frequency.** Methods rank the 120 columns; a frequency enters the ranking when either of its columns does. Keeping a frequency keeps both Re and −Im, because the instrument measures both at once.
-- **mRMR is written by hand** (the roadmap allowed it): greedy, score = |corr(x, y)| − mean |corr(x, chosen)|. It's transparent and has no pandas dependency. It is **not** the group's A\*-mRMR.
+- **mRMR is written by hand** (the plan allowed it): greedy, score = |corr(x, y)| − mean |corr(x, chosen)|. It's transparent and has no pandas dependency. It is **not** the group's A\*-mRMR.
 - **RFE:** ridge with alpha = 1 on standardised columns, step 1, eliminated down to one column, which gives the full ranking.
 - **ARD:** GPR on −Im only, every 4th spectrum (the 120-feature fit is infeasible, Day 3). Frequencies tied at the upper length-scale bound are ordered by |corr(−Im, SoH)|.
 - **Log-spaced:** the grid is log-uniform (ratio ≈ 1.265 per step at both ends), so "evenly on a log scale" equals evenly spaced indices. k = 1 is the geometric middle.
@@ -404,7 +404,7 @@ Files: `results/e1_full_spectrum.csv` (summary), `_per_cell.csv`, `_predictions.
 - The methods disagree a lot.
 - mRMR favours the **slowest, most expensive** frequencies (0.02–0.05 Hz, i.e. 20–50 s per period). It has no notion of measurement cost, which is the motivation for E3, error vs sweep time. A cost-aware selection could be a natural extension.
 - RFE recovers 17.8 Hz (Zhang's ARD frequency) and 2.74 Hz (next to his 2.16 Hz).
-- ARD ranks 20 kHz first. That point lies in the inductive, cable-dominated region (see the physics guide), which is suspicious. To check in E2: whether it survives inside the folds, and whether it actually helps.
+- ARD ranks 20 kHz first. That point lies in the inductive, cable-dominated region, which is suspicious. To check in E2: whether it survives inside the folds, and whether it actually helps.
 
 ## Day 4, Block 2: Experiment E2, error vs frequency budget
 
@@ -413,7 +413,7 @@ Files: `results/e1_full_spectrum.csv` (summary), `_per_cell.csv`, `_predictions.
 **Design decisions**
 - **Budgets:** k ∈ {1, 2, 3, 5, 8, 12, 20} plus "all" (60). "All" is the same for every selector, so it is computed once.
 - **Selection is fitted inside each fold on the 7 training cells** (`SelectedModel` under `loco_evaluate`), and the selected frequencies are logged per fold.
-- **Model: ridge, not GPR.** The roadmap allowed this if time was short, but the real reason is that GPR was worse than the mean predictor in E1 (0.139 vs 0.129). Alpha is tuned by inner leave-one-cell-out, as in E1. `SelectedModel` passes the cell ids through to the tuning (a new test checks this; 44 tests now).
+- **Model: ridge, not GPR.** The plan allowed this if time was short, but the real reason is that GPR was worse than the mean predictor in E1 (0.139 vs 0.129). Alpha is tuned by inner leave-one-cell-out, as in E1. `SelectedModel` passes the cell ids through to the tuning (a new test checks this; 44 tests now).
 - **Robustness check:** the random forest (E1's best model) with the same selectors.
 - **Random control:** 20 seeds per k, ridge only, to keep the run under an hour.
 
