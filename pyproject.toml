@@ -7,7 +7,7 @@ name = "frugal-eis"
 version = "0.1.0"
 description = "Frequency-budgeted state-of-health estimation of Li-ion cells from impedance spectra"
 requires-python = ">=3.11"
-dependencies = ["numpy", "pandas", "scikit-learn", "matplotlib", "joblib", "mrmr_selection"]
+dependencies = ["numpy", "pandas", "scipy", "scikit-learn", "matplotlib", "joblib"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

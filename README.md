@@ -94,25 +94,19 @@ python -m venv .venv
 pip install -r requirements.txt
 pip install -e .
 # download and unzip the Zenodo data into data/raw/ (see data/README.md)
-python -m pytest                       # 50 tests
-python -m experiments.e1_full_spectrum # about 5 min, mostly GPR
-python -m experiments.e1_figures
-python -m experiments.e2_frequency_budget  # about 40 min
-python -m experiments.e2_figures
-python -m experiments.e3_figures
-python -m experiments.e4_noise          # about 7 min
-python -m experiments.e4_figures
-python -m experiments.e5_selected_on_nyquist
-python -m experiments.e5_temperature
-python -m experiments.e6_footprint
+python -m pytest                  # 50 tests
+python -m experiments.run_all     # every CSV and figure in results/, about 1 hour
+python -m experiments.run_all e4  # or only the steps whose name starts with e4
 ```
+
+All seeds are fixed (`random_state=0` in the model factories; explicit seeds for the random control and the noise). Re-running reproduces the committed CSVs exactly, except columns that are wall-clock timings (`fit_s`, `latency_*`). This was checked by running everything in a fresh virtual environment built from `requirements.txt` (see `NOTES.md`, Day 6 Block 3).
 
 ## Repository layout
 
 ```
 src/frugal_eis/   data.py (loading, labels) · features.py · models.py · evaluate.py (leave-one-cell-out harness)
                   selection.py (frequency selectors) · timing.py (sweep-time estimate)
-experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py · e4_noise.py · e4_figures.py · e5_selected_on_nyquist.py · e5_temperature.py · e6_footprint.py
+experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py · e4_noise.py · e4_figures.py · e5_selected_on_nyquist.py · e5_temperature.py · e6_footprint.py · run_all.py
 notebooks/        01_eda.ipynb (exploratory analysis)
 results/          CSVs and figures written by the experiment scripts
 tests/            pytest suite

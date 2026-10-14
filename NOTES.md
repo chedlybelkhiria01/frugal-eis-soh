@@ -616,6 +616,36 @@ Over the 10 seeds, the cell-averaged RMSE spans at most 0.012 (GPR at 5 %) and a
 - **GPR stores the training set** (336 spectra × 60 inputs). Its size grows with the data, not with the model.
 - **Optional ONNX part: skipped.** `onnxruntime` has no wheel for Python 3.14 (`pip install` finds no matching version). It would need a separate Python 3.12 environment, which is not worth it for an optional item; the parameter count already answers the deployment question.
 
+## Day 6, Block 3: Reproducibility
+
+**Code:** `experiments/run_all.py` runs the 12 steps in dependency order, E1 → EDA notebook → E2 → E3 → E4 → Nyquist figure → E5 → E6.
+- `python -m experiments.run_all e4` runs only the steps whose name starts with "e4".
+- The EDA notebook is executed with `nbclient` in its own folder. The `.ipynb` itself is not modified.
+
+**Problems found**
+- **`requirements.txt` was UTF-16 without a byte-order mark** (in git since the first commit). `pip install -r` on another machine would have misread it. Rewritten as UTF-8.
+- **`mrmr-selection` was a declared dependency but never imported:** mRMR is our own implementation (Day 4). It was removed from `requirements.txt` and `pyproject.toml`.
+- Added pins for `scipy`, `threadpoolctl` and `nbclient`, so the numerical stack and the notebook runner are fixed too.
+
+**Seeds:** checked every source of randomness.
+- Model factories: `random_state=0` (RF, GPR, MLP).
+- Random control: `select_random(k, seed)`.
+- Noise: `default_rng([seed, fold])`.
+- Latency sampling: `default_rng(0)`.
+- Ridge, mRMR, RFE and ARD rankings are deterministic.
+
+**Fresh-environment check**
+- **Setup:** a new venv outside the project, from the same Python 3.14.4 base, with `pip install -r requirements.txt` and `pip install -e .`. The install produced no errors.
+- **Tests:** 50 passed.
+- **Full run:** `python -m experiments.run_all` took **64 min**. That includes a ≈ 22 min pause in one E2 configuration while the laptop slept (power problem); the run resumed normally.
+- **Errors:** none. The stderr log contains only scikit-learn/joblib warnings.
+
+**Comparison with the committed results** (script in my scratchpad, not in the repo):
+- **All 9 figures are byte-identical.** So are `e1_partial_predictions.csv` and `e5_selected_k5.csv`.
+- **Every other CSV agrees to a relative tolerance of 1e-9** in every non-timing column: RMSE, MAE, alpha, predictions and selected frequencies. Tiny last-digit differences are floating-point summation order.
+- Only the timing columns (`fit_s`, `latency_*`) change, as expected.
+- The regenerated copies were therefore discarded (`git restore results/`), and the committed results stand.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
