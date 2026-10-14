@@ -4,7 +4,7 @@
 
 A full electrochemical impedance spectroscopy (EIS) sweep down to 0.02 Hz is slow, and embedded battery-management hardware has little time, memory and computing power. If a few well-chosen frequencies keep most of the accuracy, SoH diagnosis becomes faster and cheaper. This project studies that trade-off on public data, using lightweight models and an evaluation that never tests on a cell seen in training.
 
-> **Status: work in progress.** The data pipeline, evaluation, full-spectrum baselines (E1) and error vs number of frequencies (E2) are done. Next: E3, error vs estimated measurement time.
+> **Status: work in progress.** Experiments E1–E5 are done: full-spectrum baselines, error vs number of frequencies, error vs estimated measurement time, noise robustness and temperature transfer. E3 and E4 are written up in `NOTES.md` so far; the final write-up comes next.
 
 This is a student learning project, not a research claim. It is inspired by impedance-based battery diagnosis work at the Chair of Measurement and Sensor Technology, TU Chemnitz; it re-implements none of that work and is not affiliated with it.
 
@@ -67,6 +67,23 @@ Same leave-one-cell-out setup. Source: [`results/e2_budget.csv`](results/e2_budg
 - The spread across held-out cells (std ≈ 0.03–0.05) is larger than most differences between selectors, so method rankings are uncertain.
 - 0.04 Hz means about 25 s per period: the fewest frequencies is not the fastest measurement. E3 quantifies that.
 
+## Results so far: E5, transfer to other temperatures
+
+Train on all 8 cells at 25 °C, test on each 35 °C and 45 °C cell. No temperature information and no adaptation; Zhang et al. instead trained with one cell from each temperature. RMSE per test cell; source: [`results/e5_temperature.csv`](results/e5_temperature.csv).
+
+| Model | Frequencies | 35C01 | 35C02 | 45C01 | 45C02 | Mean of 4 | 25 °C leave-one-cell-out (E2) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Mean of 25 °C SoH (floor) | 0 | 0.131 | 0.091 | 0.134 | 0.128 | 0.121 | 0.129 |
+| Ridge | all 60 | 0.079 | 0.039 | **0.357** | 0.052 | 0.132 | 0.089 |
+| Ridge | **1** (0.040 Hz, mRMR) | **0.041** | 0.067 | 0.139 | **0.036** | **0.071** | 0.080 |
+| Random forest | all 60 | 0.155 | 0.140 | 0.138 | 0.159 | 0.148 | 0.077 |
+| Random forest | 2 (20 kHz + 0.020 Hz, log-spaced) | 0.169 | 0.107 | 0.216 | 0.122 | 0.153 | 0.077 |
+
+- **The random forest, the best model at 25 °C, fails at both new temperatures.** It is worse than the floor on every test cell and overestimates SoH by 0.10–0.16 on 3 of 4 cells. Impedance drops at higher temperature, so a warm aged cell looks like a young cell at 25 °C, and trees cannot extrapolate.
+- **Full-spectrum ridge transfers to three cells but fails badly on 45C01** (RMSE 0.357). That cell has an unusually high ohmic resistance even when new (R0 ≈ 1.29 Ω, against 0.28–0.48 Ω for the other 11 cells), so a model that uses the whole spectrum reads it as heavily aged.
+- **The single 0.040 Hz frequency transfers best** (mean 0.071). It beats the floor on 3 of 4 cells and roughly ties it on 45C01 (0.139 vs 0.134). One plausible reason: at that frequency −Im(Z) of new cells varies much less with temperature (0.17–0.25 Ω) than the arc or R0 do. That is an observation on 4 cells, not a general claim.
+- Only 4 test cells, from 2 temperatures: treat this as a stress test, not an estimate of real-world accuracy.
+
 ## Reproduce
 
 Tested with Python 3.14 on Windows 11; CPU only.
@@ -86,6 +103,7 @@ python -m experiments.e3_figures
 python -m experiments.e4_noise          # about 7 min
 python -m experiments.e4_figures
 python -m experiments.e5_selected_on_nyquist
+python -m experiments.e5_temperature
 ```
 
 ## Repository layout
@@ -93,7 +111,7 @@ python -m experiments.e5_selected_on_nyquist
 ```
 src/frugal_eis/   data.py (loading, labels) · features.py · models.py · evaluate.py (leave-one-cell-out harness)
                   selection.py (frequency selectors) · timing.py (sweep-time estimate)
-experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py · e4_noise.py · e4_figures.py · e5_selected_on_nyquist.py
+experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py · e4_noise.py · e4_figures.py · e5_selected_on_nyquist.py · e5_temperature.py
 notebooks/        01_eda.ipynb (exploratory analysis)
 results/          CSVs and figures written by the experiment scripts
 tests/            pytest suite
@@ -105,12 +123,12 @@ NOTES.md          research log: decisions, findings, open questions
 - One dataset: 8 coin cells of one chemistry (LiCoO₂/graphite), one temperature, one measurement state. As the dataset's own peer reviewers note, all cells were cycled under identical conditions.
 - With 8 held-out cells, model rankings are uncertain.
 - GPR was run on −Im only, using every 4th training spectrum. A 120-feature ARD fit on every 2nd spectrum did not finish one fold in over an hour on a laptop CPU.
-- Measurement time in the planned E3 will be *estimated* from the frequencies (Σ 1/f), not measured on hardware.
+- Measurement time in E3 is *estimated* from the frequencies (3 periods each, no overhead), not measured on hardware.
+- Temperature transfer (E5) is tested on 4 cells only.
 
 ## Next
 
-- **E3:** error vs estimated sweep time.
-- **E4:** robustness to measurement noise.
-- **E5:** transfer to 35 °C and 45 °C cells.
+- Final write-up of E3 (error vs estimated sweep time) and E4 (noise robustness) in this README.
+- A fair test of cheap mid-frequency pairs (e.g. 17.8 Hz, the frequency Zhang et al. found most relevant), chosen before looking at test cells.
 
 Author: Chedly Belkhiria, Licence in Software Engineering, Faculty of Sciences of Monastir (FSM), Tunisia.

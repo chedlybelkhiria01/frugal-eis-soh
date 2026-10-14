@@ -545,6 +545,50 @@ Over the 10 seeds, the cell-averaged RMSE spans at most 0.012 (GPR at 5 %) and a
 - **Almost nobody picks the ohmic region.** Only ARD (5/40) and log-spaced, by construction. This agrees with E1, where the R0-only physics baseline (0.108) was well behind the spectrum-based models.
 - **This ties the selectors to the cost result (E3):** mRMR is the most accurate at k = 1–5 *because* it uses the slow diffusion tail, which costs 47–150 s per point (3 periods at 0.064–0.020 Hz), while the arc frequencies cost under a millisecond to about 3 s. The open lead from E3 (35.9 + 17.8 Hz, arc apex region) is exactly the cheap alternative to test fairly.
 
+## Day 6, Block 1: E5, temperature transfer
+
+**Code:** `experiments/e5_temperature.py` writes `results/e5_temperature.csv` (5 models × 4 test cells; RMSE, MAE, bias = mean(pred − true), selected frequencies, alpha). Run time under a minute.
+
+**Design decisions**
+- **Train on all 8 cells at 25 °C, test on 35C01, 35C02, 45C01, 45C02** (state V; 327, 318, 299 and 310 spectra).
+  - No temperature input and no adaptation.
+  - Zhang et al. trained with 35C01 and 45C01 included, so this test is harder than theirs.
+- **Models:** full spectrum vs the same best small-k subsets as E4 (chosen from 25 °C results only, so no test leak).
+  - Ridge alpha is tuned by leave-one-cell-out over the 25 °C cells (chose 3162 for the full spectrum, 17.8 for k = 1).
+  - The selection fitted on all 25 °C cells gives mRMR k = 1 → 0.040 Hz; log-spaced k = 2 → 20 kHz + 0.020 Hz.
+  - Mean of 25 °C SoH as the floor.
+
+**Results:** the table is in the README. Mean RMSE over 4 cells:
+
+| Model | Mean RMSE |
+|---|---|
+| ridge, 1 freq. | 0.071 |
+| floor | 0.121 |
+| ridge, full | 0.132 |
+| RF, full | 0.148 |
+| RF, 2 freq. | 0.153 |
+
+**Early-life impedance per cell [data, median over spectra with SoH > 0.9]**
+
+| Cells | R0 (Ω) | Re at 1.07 Hz (Ω) | −Im at 0.040 Hz (Ω) |
+|---|---|---|---|
+| 25 °C (8 cells) | 0.28–0.41 | 1.03–1.52 | 0.21–0.25 |
+| 35C01 / 35C02 | 0.28 / 0.48 | 0.74 / 0.94 | 0.19 / 0.19 |
+| 45C01 / 45C02 | **1.29** / 0.41 | 1.63 / 0.75 | 0.17 / 0.18 |
+
+**[me]**
+- **As expected, most models get worse, and the random forest fails outright.**
+  - It is worse than the floor on all 4 cells and biased +0.13 to +0.15 on three of them.
+  - Higher temperature → faster kinetics → smaller arc. A warm aged cell therefore looks like a young cell at 25 °C, and trees cannot extrapolate beyond the training range.
+- **45C01 is an outlier cell, not just a temperature effect.** Its R0 is 1.29 Ω from the start, against 0.28–0.48 Ω for the other 11 cells.
+  - Full-spectrum ridge reads it as heavily aged: bias −0.31, RMSE 0.357.
+  - Possible causes: contact resistance or a cell defect. I can't tell from the data, and the paper does not mention it.
+- **The single 0.040 Hz frequency transfers best** (0.071, below its own 25 °C leave-one-cell-out 0.080). It beats the floor on 3 of 4 cells and ties it on 45C01.
+  - −Im at 0.040 Hz is the least temperature-sensitive quantity in the table (0.17–0.25 Ω across all cells).
+  - Ridge on it is a near-linear map from one diffusion-tail point, so it extrapolates gently.
+  - **Caveat:** 4 test cells. "Better than at 25 °C" is within the cell-to-cell noise, so I only claim that it does *not* break.
+- **For the frugal story this is the strongest argument so far:** fewer, well-chosen frequencies were not only cheaper, but also more robust to a change of conditions than the full spectrum. It needs more cells to be a claim.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
