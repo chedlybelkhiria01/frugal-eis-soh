@@ -1,0 +1,21 @@
+selector,freq_hz,n_folds,of_folds,region
+ard,20004.453,2,8,inductive / ohmic
+ard,57.36816,3,8,SEI + charge transfer
+ard,45.3629,4,8,SEI + charge transfer
+ard,3.45686,3,8,SEI + charge transfer
+ard,0.16452,4,8,diffusion
+logspaced,20004.453,8,8,inductive / ohmic
+logspaced,596.71857,8,8,SEI + charge transfer
+logspaced,17.79613,8,8,SEI + charge transfer
+logspaced,0.67072,8,8,diffusion
+logspaced,0.01999,8,8,diffusion
+mrmr,0.06443,3,8,diffusion
+mrmr,0.05102,7,8,diffusion
+mrmr,0.04042,8,8,diffusion
+mrmr,0.03192,3,8,diffusion
+mrmr,0.01999,4,8,diffusion
+rfe,471.96338,6,8,SEI + charge transfer
+rfe,11.1448,4,8,SEI + charge transfer
+rfe,2.73547,5,8,SEI + charge transfer
+rfe,0.53067,3,8,diffusion
+rfe,0.01999,5,8,diffusion

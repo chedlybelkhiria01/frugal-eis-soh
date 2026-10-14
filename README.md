@@ -85,6 +85,7 @@ python -m experiments.e2_figures
 python -m experiments.e3_figures
 python -m experiments.e4_noise          # about 7 min
 python -m experiments.e4_figures
+python -m experiments.e5_selected_on_nyquist
 ```
 
 ## Repository layout
@@ -92,7 +93,7 @@ python -m experiments.e4_figures
 ```
 src/frugal_eis/   data.py (loading, labels) · features.py · models.py · evaluate.py (leave-one-cell-out harness)
                   selection.py (frequency selectors) · timing.py (sweep-time estimate)
-experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py · e4_noise.py · e4_figures.py
+experiments/      e1_partial.py · e1_full_spectrum.py · e1_figures.py · e2_frequency_budget.py · e2_figures.py · e3_figures.py · e4_noise.py · e4_figures.py · e5_selected_on_nyquist.py
 notebooks/        01_eda.ipynb (exploratory analysis)
 results/          CSVs and figures written by the experiment scripts
 tests/            pytest suite

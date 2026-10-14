@@ -516,6 +516,35 @@ Over the 10 seeds, the cell-averaged RMSE spans at most 0.012 (GPR at 5 %) and a
 5. **GPR is the worst at every level and degrades the most** (+0.020 at 5 %), consistent with E1: its fit has a very small noise term, so it is sensitive to inputs away from the training spectra.
 - **Open:** what noise level is realistic for this instrument? I have not checked the instrument's accuracy spec. If it is around 1 % or better, the frugal subsets are safe; that needs a source before it goes in the report.
 
+## Day 5, Block 3: Where on the spectrum do the selectors pick?
+
+**Code:** `experiments/e5_selected_on_nyquist.py` writes `results/figures/fig5_selected_on_nyquist.png` and `results/e5_selected_k5.csv`. No new training; it uses E2's per-fold k = 5 selections.
+
+**Design decisions**
+- **Typical spectrum:** cell 25C01 (the longest-lived) at SoH ≈ 0.90, i.e. cycle 22, mid-life.
+- **Which 5 per selector:** selections differ between folds, so the figure marks the 5 frequencies each selector chose **most often over the 8 folds**. Because that hides the picks that change from fold to fold, the table below also counts **all 40 per-fold picks**.
+- **Regions are read off the spectrum, not fitted with a circuit** [data + me]:
+  - **inductive / ohmic:** f ≥ 9.9 kHz, where −Im(Z) crosses zero; the real-axis intercept ≈ R0;
+  - **SEI + charge transfer:** 9.9 kHz > f > 1.07 Hz, the depressed arc (apex ≈ 36 Hz). The SEI and charge-transfer arcs overlap here, so they are not separated;
+  - **diffusion:** f ≤ 1.07 Hz, below the valley between arc and tail; the rising Warburg-like tail.
+  - The boundaries come from this one spectrum and shift a little with aging.
+- First version bug: I located "the top of the arc" as the global maximum of −Im, but in aged spectra the tail ends higher than the arc. I fixed it by taking the first local maximum.
+
+**Results [data, `e5_selected_k5.csv` and script output]**
+
+| Selector | Most-often-chosen 5 (Hz, folds out of 8) | All 40 per-fold picks: ohmic / arc / diffusion |
+|---|---|---|
+| mRMR | 0.064 (3), 0.051 (7), 0.040 (8), 0.032 (3), 0.020 (4) | 0 / 14 / 26 |
+| RFE | 472 (6), 11.1 (4), 2.74 (5), 0.53 (3), 0.020 (5) | 1 / 27 / 12 |
+| ARD | 20000 (2), 57.4 (3), 45.4 (4), 3.46 (3), 0.165 (4) | 5 / 27 / 8 |
+| log-spaced (fixed) | 20000, 597, 17.8, 0.67, 0.020 (8 each) | 8 / 16 / 16 |
+
+**[me] Answer to "which part do they pick?"**
+- **mRMR picks the diffusion tail**: its 4–5 most stable picks are all between 0.02 and 0.064 Hz. The 14 arc picks are each fold's single "different" frequency, a different arc point in almost every fold (73 Hz to 4.9 kHz, see Day 4). Physically, this matches lithium transport in the electrodes slowing down with aging, but that is an interpretation, not tested here.
+- **RFE and ARD mostly pick the SEI / charge-transfer arc.** That is where Zhang et al.'s ARD found 17.8 Hz and 2.16 Hz, and where Kallel et al.'s R_SEI / (R_SEI + R_ct) indicator lives. ARD also takes 20 kHz in some folds (inductive, cable-dominated; suspicious since Day 4).
+- **Almost nobody picks the ohmic region.** Only ARD (5/40) and log-spaced, by construction. This agrees with E1, where the R0-only physics baseline (0.108) was well behind the spectrum-based models.
+- **This ties the selectors to the cost result (E3):** mRMR is the most accurate at k = 1–5 *because* it uses the slow diffusion tail, which costs 60–75 s per point (3 periods), while the arc frequencies cost milliseconds to a fraction of a second. The open lead from E3 (35.9 + 17.8 Hz, arc apex region) is exactly the cheap alternative to test fairly.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
