@@ -589,6 +589,33 @@ Over the 10 seeds, the cell-averaged RMSE spans at most 0.012 (GPR at 5 %) and a
   - **Caveat:** 4 test cells. "Better than at 25 °C" is within the cell-to-cell noise, so I only claim that it does *not* break.
 - **For the frugal story this is the strongest argument so far:** fewer, well-chosen frequencies were not only cheaper, but also more robust to a change of conditions than the full spectrum. It needs more cells to be a claim.
 
+## Day 6, Block 2: E6, model footprint (optional block)
+
+**Code:** `experiments/e6_footprint.py` writes `results/e6_footprint.csv`. Each model is fitted once on all 25 °C cells (the same 5 models as E4).
+- **Size:** `joblib.dump` of the whole fitted object, uncompressed.
+- **n_numbers:** the parameters an embedded port would have to store.
+- **Latency:** 1000 single-spectrum `predict()` calls, each timed separately, after 50 warm-up calls.
+
+**Results [data; latency = range of the median over 3 runs, Intel laptop CPU, Python 3.14]**
+
+| Model | Frequencies | joblib size | Numbers to store | Median latency |
+|---|---|---|---|---|
+| ridge | 1 (0.040 Hz) | 3.7 KiB | **7** | 0.5–0.75 ms |
+| ridge | 60 | 8.0 KiB | 361 | 0.5–0.6 ms |
+| GPR (−Im) | 60 | 1.0 MiB | 20,676 | 0.8–0.85 ms |
+| random forest | 2 | 35 MiB | 1.5 M | 36–44 ms |
+| random forest | 60 | 35 MiB | 1.5 M | 37–45 ms |
+
+**Problems found and fixed**
+- **The random forest's first latency run was 100–190 ms per call.** It is trained with `n_jobs=-1`, so every one-sample `predict` started a thread pool, and joblib flooded the console with warnings. Inference is now single-threaded (`n_jobs = 1`), as a deployed model would be.
+- **Ridge latencies swap order between runs** (k = 1 was faster in one run and slower in the next). At ≈ 0.5 ms they measure scikit-learn's per-call Python overhead (input checks, pipeline), not arithmetic. **Only order-of-magnitude differences are meaningful here.**
+
+**[me]**
+- **Ridge on one frequency is the most frugal model in every sense.** It is 7 numbers: 2 means, 2 scales, 2 coefficients and an intercept. On a microcontroller that is a handful of multiply-adds, i.e. microseconds, and it fits in any memory. It is also the best-transferring model in E5.
+- **The random forest is about 200,000× bigger in parameters** and about 60× slower per call here. Using 2 frequencies does not shrink it, because the size comes from 300 deep trees with roughly one leaf per training spectrum, not from the inputs. It is not a realistic embedded model without heavy pruning.
+- **GPR stores the training set** (336 spectra × 60 inputs). Its size grows with the data, not with the model.
+- **Optional ONNX part: skipped.** `onnxruntime` has no wheel for Python 3.14 (`pip install` finds no matching version). It would need a separate Python 3.12 environment, which is not worth it for an optional item; the parameter count already answers the deployment question.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
