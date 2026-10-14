@@ -646,6 +646,23 @@ Over the 10 seeds, the cell-averaged RMSE spans at most 0.012 (GPR at 5 %) and a
 - Only the timing columns (`fit_s`, `latency_*`) change, as expected.
 - The regenerated copies were therefore discarded (`git restore results/`), and the committed results stand.
 
+## Day 6: "Done when" check, fresh clone
+
+**Setup**
+- A `git clone` of the repository; GitHub itself was briefly unreachable, so I cloned the local copy, which was at the same commit `e40bb99`. That gives committed files only.
+- Raw data added exactly as `data/README.md` says, with **only the required** Zenodo folders. The optional tutorial CSV was left out on purpose.
+- A new venv built from `requirements.txt`.
+
+**Result**
+- `pytest`: 49 passed, 1 skipped. The skip is the cross-check that needs the optional tutorial CSV; it is skipped as intended.
+- **Every relative link in the README** (5 figures, 5 CSVs, `data/README.md`) exists in the clone.
+- **`run_all` found a real bug.** The EDA notebook always read the tutorial CSV, which the docs call optional, so the run crashed at step 4 without it. My earlier fresh-venv run had missed this because my working copy has the CSV.
+  - **Fix (commit `602c95d`):** the notebook's cross-check cells run only if the CSV exists, and otherwise print "skipped".
+  - I re-executed the notebook so its stored outputs match the code; the EDA figures came out unchanged.
+- **After the fix, the run completed in the clone with no errors** (steps 4–12 resumed; E1 had already finished).
+  - All 9 figures are byte-identical to the committed ones.
+  - All CSVs match to 1e-9 except the timing columns.
+
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
 - [x] Capacity ↔ impedance pairing: impedance cycle n ↔ discharge capacity of capacity cycle n − 1 (see Block 4)
