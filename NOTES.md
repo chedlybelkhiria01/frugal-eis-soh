@@ -543,7 +543,7 @@ Over the 10 seeds, the cell-averaged RMSE spans at most 0.012 (GPR at 5 %) and a
 - **mRMR picks the diffusion tail**: its 4–5 most stable picks are all between 0.02 and 0.064 Hz. The 14 arc picks are each fold's single "different" frequency, a different arc point in almost every fold (73 Hz to 4.9 kHz, see Day 4). Physically, this matches lithium transport in the electrodes slowing down with aging, but that is an interpretation, not tested here.
 - **RFE and ARD mostly pick the SEI / charge-transfer arc.** That is where Zhang et al.'s ARD found 17.8 Hz and 2.16 Hz, and where Kallel et al.'s R_SEI / (R_SEI + R_ct) indicator lives. ARD also takes 20 kHz in some folds (inductive, cable-dominated; suspicious since Day 4).
 - **Almost nobody picks the ohmic region.** Only ARD (5/40) and log-spaced, by construction. This agrees with E1, where the R0-only physics baseline (0.108) was well behind the spectrum-based models.
-- **This ties the selectors to the cost result (E3):** mRMR is the most accurate at k = 1–5 *because* it uses the slow diffusion tail, which costs 60–75 s per point (3 periods), while the arc frequencies cost milliseconds to a fraction of a second. The open lead from E3 (35.9 + 17.8 Hz, arc apex region) is exactly the cheap alternative to test fairly.
+- **This ties the selectors to the cost result (E3):** mRMR is the most accurate at k = 1–5 *because* it uses the slow diffusion tail, which costs 47–150 s per point (3 periods at 0.064–0.020 Hz), while the arc frequencies cost under a millisecond to about 3 s. The open lead from E3 (35.9 + 17.8 Hz, arc apex region) is exactly the cheap alternative to test fairly.
 
 ## Open questions / TODO
 - [x] Supplementary Fig. 1 of Zhang 2020: definitions of states I–IX (table in section 1)
